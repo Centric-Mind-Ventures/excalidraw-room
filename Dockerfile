@@ -9,5 +9,7 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN yarn build
 
-EXPOSE 80
+EXPOSE 8080
+ENV PORT=8008
+ENV DEBUG=*,-socket.io:*,-engine:*,-socket.io-parser
 CMD ["yarn", "start"]
