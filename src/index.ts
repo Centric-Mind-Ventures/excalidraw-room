@@ -3,9 +3,9 @@ import express from "express";
 import http from "http";
 import socketIO from "socket.io";
 
-const serverDebug = debug("server");
-const ioDebug = debug("io");
-const socketDebug = debug("socket");
+const serverDebug = debug("excalidraw:server");
+const ioDebug = debug("excalidraw:io");
+const socketDebug = debug("excalidraw:socket");
 
 const app = express();
 const port = process.env.PORT || 80; // default port to listen
@@ -19,7 +19,7 @@ app.get("/", (req, res) => {
 const server = http.createServer(app);
 
 server.listen(port, () => {
-  serverDebug(`listening on port: ${port}`);
+  serverDebug(`listening on port ${port}`);
 });
 
 const io = socketIO(server, {
@@ -36,7 +36,6 @@ const io = socketIO(server, {
 });
 
 io.on("connection", (socket) => {
-  ioDebug("connection established!");
   io.to(`${socket.id}`).emit("init-room");
   socket.on("join-room", (roomID) => {
     socketDebug(`${socket.id} has joined ${roomID}`);
@@ -50,6 +49,23 @@ io.on("connection", (socket) => {
       "room-user-change",
       Object.keys(io.sockets.adapter.rooms[roomID].sockets),
     );
+  });
+
+  socket.on("slotSelected", (slotIndex, sessionIdentifier) => {
+    socketDebug(
+      `Slot ${slotIndex} for session ${sessionIdentifier} has been selected`,
+    );
+    socket.emit("slotSelected", slotIndex, sessionIdentifier);
+  });
+
+  socket.on("sessionLogoutByTeacher", (sessionIdentifier) => {
+    socketDebug(`Session ${sessionIdentifier} has been finished by teacher`);
+    socket.emit("sessionLogoutByTeacher", sessionIdentifier);
+  });
+
+  socket.on("sessionStartedByTeacher", (sessionIdentifier) => {
+    socketDebug(`Session ${sessionIdentifier} has been started by teacher`);
+    socket.emit("sessionStartedByTeacher", sessionIdentifier);
   });
 
   socket.on(
