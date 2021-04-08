@@ -10,6 +10,8 @@ const socketDebug = debug("excalidraw:socket");
 const app = express();
 const port = process.env.PORT || 80; // default port to listen
 
+const roomData: { [key: string]: Array<any> } = {};
+
 app.use(express.static("public"));
 
 app.get("/", (req, res) => {
@@ -45,6 +47,10 @@ io.on("connection", (socket) => {
     } else {
       socket.broadcast.to(roomID).emit("new-user", socket.id);
     }
+    if (roomData[roomID] !== undefined) {
+      ioDebug(`Sending ${roomData[roomID][0].length} bytes of data for room ${roomID}`);
+      socket.emit("client-broadcast", ...roomData[roomID]);
+    }
     io.in(roomID).emit(
       "room-user-change",
       Object.keys(io.sockets.adapter.rooms[roomID].sockets),
@@ -53,25 +59,34 @@ io.on("connection", (socket) => {
 
   socket.on("slotSelected", (slotIndex, sessionIdentifier) => {
     socketDebug(
-      `Slot ${slotIndex} for session ${sessionIdentifier} has been selected`,
+      `Slot ${slotIndex} for session ${sessionIdentifier} has been selected. Broadcasting...`,
     );
-    socket.emit("slotSelected", slotIndex, sessionIdentifier);
+    socket.broadcast.emit("slotSelected", slotIndex, sessionIdentifier);
   });
 
   socket.on("sessionLogoutByTeacher", (sessionIdentifier) => {
     socketDebug(`Session ${sessionIdentifier} has been finished by teacher`);
-    socket.emit("sessionLogoutByTeacher", sessionIdentifier);
+    socket.broadcast.emit("sessionLogoutByTeacher", sessionIdentifier);
   });
 
   socket.on("sessionStartedByTeacher", (sessionIdentifier) => {
     socketDebug(`Session ${sessionIdentifier} has been started by teacher`);
-    socket.emit("sessionStartedByTeacher", sessionIdentifier);
+    socket.broadcast.emit("sessionStartedByTeacher", sessionIdentifier);
   });
 
   socket.on(
     "server-broadcast",
-    (roomID: string, encryptedData: ArrayBuffer, iv: Uint8Array) => {
+    (
+      roomID: string,
+      encryptedData: ArrayBuffer,
+      iv: Uint8Array,
+      containsAllData: boolean,
+    ) => {
       socketDebug(`${socket.id} sends update to ${roomID}`);
+      if (containsAllData) {
+        ioDebug(`Storing data for room ${roomID}`);
+        roomData[roomID] = [encryptedData, iv];
+      }
       socket.broadcast.to(roomID).emit("client-broadcast", encryptedData, iv);
     },
   );
@@ -79,7 +94,6 @@ io.on("connection", (socket) => {
   socket.on(
     "server-volatile-broadcast",
     (roomID: string, encryptedData: ArrayBuffer, iv: Uint8Array) => {
-      socketDebug(`${socket.id} sends volatile update to ${roomID}`);
       socket.volatile.broadcast
         .to(roomID)
         .emit("client-broadcast", encryptedData, iv);
