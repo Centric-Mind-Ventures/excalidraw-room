@@ -2,6 +2,7 @@ import debug from "debug";
 import express from "express";
 import http from "http";
 import socketIO from "socket.io";
+import { type } from "os";
 
 const serverDebug = debug("excalidraw:server");
 const ioDebug = debug("excalidraw:io");
@@ -48,7 +49,9 @@ io.on("connection", (socket) => {
       socket.broadcast.to(roomID).emit("new-user", socket.id);
     }
     if (roomData[roomID] !== undefined) {
-      ioDebug(`Sending ${roomData[roomID][0].length} bytes of data for room ${roomID}`);
+      ioDebug(
+        `Sending ${roomData[roomID][0].length} bytes of data for room ${roomID}`,
+      );
       socket.emit("client-broadcast", ...roomData[roomID]);
     }
     io.in(roomID).emit(
@@ -63,6 +66,22 @@ io.on("connection", (socket) => {
     );
     socket.broadcast.emit("slotSelected", slotIndex, sessionIdentifier);
   });
+
+  socket.on(
+    "confidenceSelected",
+    (userIdentifier, questionIdentifier, sessionIdentifier, typeAsInt) => {
+      socketDebug(
+        `Confidence ${typeAsInt} with question ${questionIdentifier} for session ${sessionIdentifier} has been selected. Broadcasting...`,
+      );
+      socket.broadcast.emit(
+        "confidenceSelected",
+        userIdentifier,
+        questionIdentifier,
+        sessionIdentifier,
+        typeAsInt,
+      );
+    },
+  );
 
   socket.on("sessionLogoutByTeacher", (sessionIdentifier) => {
     socketDebug(`Session ${sessionIdentifier} has been finished by teacher`);
